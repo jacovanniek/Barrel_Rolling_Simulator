@@ -1,0 +1,14 @@
+/* src/App.css */
+.App {
+  font-family: sans-serif;
+  text-align: center;
+}
+
+.controls {
+  margin-top: 1rem;
+}
+
+label {
+  display: block;
+  margin: 0.5rem;
+}

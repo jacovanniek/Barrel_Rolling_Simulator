@@ -1,0 +1,131 @@
+// React + D3 Barrel Rolling Simulation Web App
+// File: src/App.jsx
+
+import React, { useState, useEffect, useRef } from 'react';
+import * as d3 from 'd3';
+import './App.css';
+
+const RADIUS = 100;
+const MASS = 1;
+const I = 0.5 * MASS * RADIUS ** 2;
+const F_MAG = 1;
+const MU = 0.3;
+const TIME_STEP = 0.05;
+
+export default function App() {
+  const svgRef = useRef();
+  const [angle, setAngle] = useState(0);
+  const [xPull, setXPull] = useState(0);
+  const [yPull, setYPull] = useState(75);
+
+  const [theta, setTheta] = useState(0);
+  const [xBarrel, setXBarrel] = useState(250);
+  const [angularVelocity, setAngularVelocity] = useState(0);
+  const [linearVelocity, setLinearVelocity] = useState(0);
+  const [torqueVal, setTorqueVal] = useState(0);
+
+  useEffect(() => {
+    const svg = d3.select(svgRef.current);
+    svg.selectAll('*').remove();
+
+    // Draw barrel circle
+    svg.append('circle')
+      .attr('id', 'barrel')
+      .attr('cx', xBarrel)
+      .attr('cy', 200)
+      .attr('r', RADIUS)
+      .attr('stroke', 'black')
+      .attr('fill', 'none')
+      .attr('stroke-width', 2);
+
+    // Center marker
+    svg.append('circle')
+      .attr('id', 'center')
+      .attr('cx', xBarrel)
+      .attr('cy', 200)
+      .attr('r', 3)
+      .attr('fill', 'red');
+
+    // Force point
+    const xAnchor = xBarrel + xPull;
+    const yAnchor = 200 - yPull;
+    svg.append('circle')
+      .attr('id', 'force-point')
+      .attr('cx', xAnchor)
+      .attr('cy', yAnchor)
+      .attr('r', 5)
+      .attr('fill', 'blue');
+
+    // Dashed radius line
+    svg.append('line')
+      .attr('x1', xBarrel)
+      .attr('y1', 200)
+      .attr('x2', xAnchor)
+      .attr('y2', yAnchor)
+      .attr('stroke', 'gray')
+      .attr('stroke-dasharray', '5,5');
+
+    // Force vector
+    const angleRad = angle * Math.PI / 180;
+    const forceVec = [Math.cos(angleRad) * 30, -Math.sin(angleRad) * 30];
+
+    svg.append('line')
+      .attr('x1', xAnchor)
+      .attr('y1', yAnchor)
+      .attr('x2', xAnchor + forceVec[0])
+      .attr('y2', yAnchor + forceVec[1])
+      .attr('stroke', 'blue')
+      .attr('marker-end', 'url(#arrow)');
+
+    // Torque calculation
+    const rVec = [xPull, yPull];
+    const torque = rVec[0] * forceVec[1] - rVec[1] * forceVec[0];
+    setTorqueVal(torque);
+
+    // Barrel movement update
+    const angularAcc = torque / I;
+    const newAngularVelocity = angularVelocity + angularAcc * TIME_STEP;
+    const newTheta = theta + newAngularVelocity * TIME_STEP;
+
+    const acc = F_MAG * Math.cos(angleRad) / MASS;
+    const newLinearVelocity = linearVelocity + acc * TIME_STEP;
+    const newX = xBarrel + newLinearVelocity * TIME_STEP;
+
+    // Friction adjustment
+    const slip = Math.abs(newLinearVelocity - RADIUS * newAngularVelocity) > 1e-2;
+    const frictionTorque = MU * MASS * 9.81 * RADIUS * (torque > 0 ? -1 : 1);
+    const adjustedAngularVelocity = slip ? newAngularVelocity + (frictionTorque / I) * TIME_STEP : newLinearVelocity / RADIUS;
+
+    // Update state
+    setAngularVelocity(adjustedAngularVelocity);
+    setTheta(newTheta);
+    setLinearVelocity(newLinearVelocity);
+    setXBarrel(newX);
+
+  }, [angle, xPull, yPull]);
+
+  return (
+    <div className="App">
+      <h2>Barrel Rolling Simulator</h2>
+      <svg ref={svgRef} width={600} height={400}>
+        <defs>
+          <marker id="arrow" markerWidth="10" markerHeight="10" refX="5" refY="3" orient="auto" markerUnits="strokeWidth">
+            <path d="M0,0 L0,6 L9,3 z" fill="blue" />
+          </marker>
+        </defs>
+      </svg>
+      <div className="controls">
+        <label>Rope Angle: {angle.toFixed(0)}°
+          <input type="range" min="0" max="360" value={angle} onChange={e => setAngle(+e.target.value)} />
+        </label>
+        <label>X Position: {xPull.toFixed(2)}
+          <input type="range" min={-RADIUS} max={RADIUS} step={1} value={xPull} onChange={e => setXPull(+e.target.value)} />
+        </label>
+        <label>Y Position: {yPull.toFixed(2)}
+          <input type="range" min={-RADIUS} max={RADIUS} step={1} value={yPull} onChange={e => setYPull(+e.target.value)} />
+        </label>
+      </div>
+      <p>Torque: {torqueVal.toFixed(2)} Nm — Direction: {torqueVal > 0 ? 'CCW (Left)' : torqueVal < 0 ? 'CW (Right)' : 'None'}</p>
+    </div>
+  );
+}
